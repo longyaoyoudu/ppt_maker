@@ -7,12 +7,21 @@
 ## 文档
 
 - 设计文档：[docs/superpowers/specs/2026-06-21-ppt-maker-design.md](docs/superpowers/specs/2026-06-21-ppt-maker-design.md)
+- 实现计划：[docs/superpowers/plans/2026-06-21-ppt-maker-impl.md](docs/superpowers/plans/2026-06-21-ppt-maker-impl.md)
 
-## 快速开始（待实现）
+## 快速开始
 
 ```bash
 pip install -r requirements.txt
-python run.py           # 浏览器访问 http://localhost:8000
+python run.py
+```
+
+然后浏览器访问 <http://127.0.0.1:8000>。
+
+## 测试
+
+```bash
+pytest
 ```
 
 ## 系统依赖
