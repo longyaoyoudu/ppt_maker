@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>PPT Maker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <header class="border-b bg-white">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+      <h1 class="text-xl font-semibold">PPT Maker</h1>
+      <nav class="flex gap-2" id="tabs">
+        <button data-tab="config" class="tab px-3 py-1.5 rounded-md text-sm">模型配置</button>
+        <button data-tab="outline" class="tab px-3 py-1.5 rounded-md text-sm">大纲设计</button>
+        <button data-tab="generate" class="tab px-3 py-1.5 rounded-md text-sm">生成 PPT</button>
+        <button data-tab="history" class="tab px-3 py-1.5 rounded-md text-sm">历史记录</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-6 py-8">
+    <!-- Tab: Config -->
+    <section data-panel="config" class="space-y-6">
+      <h2 class="text-lg font-semibold">模型配置</h2>
+      <p class="text-sm text-slate-600">为两个阶段分别配置大模型。API Key 仅保存在本地浏览器所在设备的 SQLite 中。</p>
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Outline stage card -->
+        <div class="bg-white border rounded-lg p-4 space-y-3">
+          <h3 class="font-medium">大纲设计模型</h3>
+          <select data-cfg="outline.provider" class="w-full border rounded px-2 py-1.5 text-sm">
+            <option value="openai">OpenAI 兼容 (GPT, DeepSeek, Moonshot, Zhipu, Ollama ...)</option>
+            <option value="claude">Anthropic Claude</option>
+          </select>
+          <label class="block text-xs text-slate-500">Base URL (仅 OpenAI 兼容需要)</label>
+          <input data-cfg="outline.base_url" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="https://api.openai.com/v1">
+          <label class="block text-xs text-slate-500">API Key</label>
+          <input data-cfg="outline.api_key" type="password" class="w-full border rounded px-2 py-1.5 text-sm">
+          <label class="block text-xs text-slate-500">Model Name</label>
+          <input data-cfg="outline.model_name" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="gpt-4o / claude-sonnet-4-6">
+          <button data-action="save-config" data-stage="outline" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">保存</button>
+        </div>
+        <!-- PPT stage card (mirrors above, data-stage="ppt") -->
+        <div class="bg-white border rounded-lg p-4 space-y-3">
+          <h3 class="font-medium">PPT 生成模型</h3>
+          <select data-cfg="ppt.provider" class="w-full border rounded px-2 py-1.5 text-sm">
+            <option value="openai">OpenAI 兼容</option>
+            <option value="claude">Anthropic Claude</option>
+          </select>
+          <label class="block text-xs text-slate-500">Base URL (仅 OpenAI 兼容需要)</label>
+          <input data-cfg="ppt.base_url" class="w-full border rounded px-2 py-1.5 text-sm">
+          <label class="block text-xs text-slate-500">API Key</label>
+          <input data-cfg="ppt.api_key" type="password" class="w-full border rounded px-2 py-1.5 text-sm">
+          <label class="block text-xs text-slate-500">Model Name</label>
+          <input data-cfg="ppt.model_name" class="w-full border rounded px-2 py-1.5 text-sm">
+          <button data-action="save-config" data-stage="ppt" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">保存</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab: Outline -->
+    <section data-panel="outline" class="space-y-6 hidden">
+      <h2 class="text-lg font-semibold">大纲设计</h2>
+      <div class="bg-white border rounded-lg p-4 space-y-3">
+        <label class="block text-xs text-slate-500">主题</label>
+        <input id="outline-topic" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="例如：AI 在医疗领域的应用">
+        <label class="block text-xs text-slate-500">补充要求 (可选)</label>
+        <textarea id="outline-requirements" rows="3" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="例如：面向医生群体、希望偏学术风格"></textarea>
+        <button data-action="generate-outline" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">生成大纲</button>
+      </div>
+      <div id="outline-pages" class="space-y-3"></div>
+      <div id="outline-actions" class="hidden">
+        <button data-action="save-outline" class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded">保存大纲</button>
+        <button data-action="go-generate" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">下一步：生成 PPT</button>
+      </div>
+    </section>
+
+    <!-- Tab: Generate -->
+    <section data-panel="generate" class="space-y-6 hidden">
+      <h2 class="text-lg font-semibold">生成 PPT</h2>
+      <div class="bg-white border rounded-lg p-4 space-y-3">
+        <label class="block text-xs text-slate-500">选择大纲</label>
+        <select id="generate-outline-id" class="w-full border rounded px-2 py-1.5 text-sm"></select>
+        <label class="block text-xs text-slate-500">风格</label>
+        <select id="generate-style" class="w-full border rounded px-2 py-1.5 text-sm">
+          <option value="business">商务通用</option>
+          <option value="academic">学术严谨</option>
+          <option value="minimal">极简现代</option>
+          <option value="creative">创意活泼</option>
+        </select>
+        <label class="block text-xs text-slate-500">配图</label>
+        <select id="generate-image-mode" class="w-full border rounded px-2 py-1.5 text-sm">
+          <option value="placeholder">占位图</option>
+          <option value="ai">AI 生成 (需 OpenAI 兼容服务)</option>
+          <option value="none">不插图</option>
+        </select>
+        <button data-action="generate-ppt" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">生成 PPT</button>
+      </div>
+      <div id="generate-result" class="bg-white border rounded-lg p-4 hidden space-y-2">
+        <div id="generate-status" class="text-sm"></div>
+        <div class="flex gap-2">
+          <a id="download-pptx" class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded" target="_blank">下载 .pptx</a>
+          <a id="download-pdf" class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded" target="_blank">下载 .pdf</a>
+        </div>
+        <div id="pdf-warning" class="text-xs text-amber-600 hidden"></div>
+      </div>
+    </section>
+
+    <!-- Tab: History -->
+    <section data-panel="history" class="space-y-6 hidden">
+      <h2 class="text-lg font-semibold">历史记录</h2>
+      <div>
+        <h3 class="font-medium mb-2">大纲</h3>
+        <ul id="history-outlines" class="space-y-2 text-sm"></ul>
+      </div>
+      <div>
+        <h3 class="font-medium mb-2">生成</h3>
+        <ul id="history-generations" class="space-y-2 text-sm"></ul>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Tab switching
+    const tabs = document.querySelectorAll('#tabs .tab');
+    tabs.forEach(btn => btn.addEventListener('click', () => {
+      const name = btn.dataset.tab;
+      document.querySelectorAll('[data-panel]').forEach(p => p.classList.add('hidden'));
+      document.querySelector(`[data-panel="${name}"]`).classList.remove('hidden');
+      tabs.forEach(t => t.classList.remove('bg-blue-50', 'text-blue-700'));
+      btn.classList.add('bg-blue-50', 'text-blue-700');
+      if (name === 'generate') refreshGenerateSelect();
+      if (name === 'history') refreshHistory();
+    }));
+    document.querySelector('#tabs .tab[data-tab="config"]').classList.add('bg-blue-50', 'text-blue-700');
+
+    async function api(method, url, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(url, opts);
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(`${r.status}: ${text}`);
+      }
+      return r.status === 204 ? null : r.json();
+    }
+
+    // ---- Config tab ----
+    document.querySelectorAll('[data-action="save-config"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const stage = btn.dataset.stage;
+        const payload = {
+          stage,
+          provider: document.querySelector(`[data-cfg="${stage}.provider"]`).value,
+          base_url: document.querySelector(`[data-cfg="${stage}.base_url"]`).value || null,
+          api_key: document.querySelector(`[data-cfg="${stage}.api_key"]`).value,
+          model_name: document.querySelector(`[data-cfg="${stage}.model_name"]`).value,
+        };
+        try {
+          await api('PUT', `/api/config/${stage}`, payload);
+          btn.textContent = '已保存';
+          setTimeout(() => btn.textContent = '保存', 1500);
+        } catch (e) {
+          alert('保存失败：' + e.message);
+        }
+      });
+    });
+
+    // Load existing config on page load
+    async function loadConfig() {
+      for (const stage of ['outline', 'ppt']) {
+        try {
+          const cfg = await api('GET', `/api/config/${stage}`);
+          document.querySelector(`[data-cfg="${stage}.provider"]`).value = cfg.provider;
+          document.querySelector(`[data-cfg="${stage}.base_url"]`).value = cfg.base_url || '';
+          document.querySelector(`[data-cfg="${stage}.api_key"]`).value = cfg.api_key;
+          document.querySelector(`[data-cfg="${stage}.model_name"]`).value = cfg.model_name;
+        } catch (e) { /* missing is fine */ }
+      }
+    }
+    loadConfig();
+
+    // ---- Outline tab ----
+    let currentOutlineId = null;
+    let currentPages = [];
+    document.querySelector('[data-action="generate-outline"]').addEventListener('click', async () => {
+      const topic = document.getElementById('outline-topic').value.trim();
+      const requirements = document.getElementById('outline-requirements').value.trim() || null;
+      if (!topic) { alert('请输入主题'); return; }
+      const btn = document.querySelector('[data-action="generate-outline"]');
+      btn.textContent = '生成中...'; btn.disabled = true;
+      try {
+        const res = await api('POST', '/api/outline/generate', { topic, requirements });
+        currentOutlineId = res.outline_id;
+        currentPages = res.content.pages;
+        renderOutlinePages();
+        document.getElementById('outline-actions').classList.remove('hidden');
+      } catch (e) {
+        alert('生成失败：' + e.message);
+      } finally {
+        btn.textContent = '生成大纲'; btn.disabled = false;
+      }
+    });
+
+    function renderOutlinePages() {
+      const host = document.getElementById('outline-pages');
+      host.innerHTML = '';
+      currentPages.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.className = 'bg-white border rounded-lg p-4 space-y-2';
+        card.innerHTML = `
+          <div class="flex justify-between">
+            <span class="text-xs text-slate-500">第 ${idx + 1} 页</span>
+            <button data-action="delete-page" data-idx="${idx}" class="text-xs text-red-500">删除</button>
+          </div>
+          <input data-edit="title" data-idx="${idx}" class="w-full border rounded px-2 py-1 text-sm" value="${escapeHtml(p.title)}">
+          <select data-edit="layout" data-idx="${idx}" class="w-full border rounded px-2 py-1 text-sm">
+            ${['title','title-content','two-column','quote','section'].map(l => `<option value="${l}" ${l===p.layout?'selected':''}>${l}</option>`).join('')}
+          </select>
+          <textarea data-edit="key_points" data-idx="${idx}" rows="3" class="w-full border rounded px-2 py-1 text-sm">${(p.key_points||[]).map(escapeHtml).join('\n')}</textarea>
+        `;
+        host.appendChild(card);
+      });
+      host.querySelectorAll('[data-action="delete-page"]').forEach(b => b.addEventListener('click', () => {
+        const i = +b.dataset.idx; currentPages.splice(i, 1); renderOutlinePages();
+      }));
+      host.querySelectorAll('[data-edit]').forEach(el => el.addEventListener('input', () => {
+        const i = +el.dataset.idx, k = el.dataset.edit;
+        if (k === 'key_points') currentPages[i][k] = el.value.split('\n').map(s => s.trim()).filter(Boolean);
+        else currentPages[i][k] = el.value;
+      }));
+    }
+
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    document.querySelector('[data-action="save-outline"]').addEventListener('click', async () => {
+      if (!currentOutlineId) return;
+      const body = { topic: document.getElementById('outline-topic').value.trim(),
+                     requirements: document.getElementById('outline-requirements').value.trim() || null,
+                     pages: currentPages };
+      try {
+        await api('PUT', `/api/outline/${currentOutlineId}`, { content: body });
+        alert('已保存');
+      } catch (e) {
+        alert('保存失败：' + e.message);
+      }
+    });
+    document.querySelector('[data-action="go-generate"]').addEventListener('click', () => {
+      document.querySelector('#tabs .tab[data-tab="generate"]').click();
+    });
+
+    // ---- Generate tab ----
+    async function refreshGenerateSelect() {
+      try {
+        const list = await api('GET', '/api/history/outlines');
+        const sel = document.getElementById('generate-outline-id');
+        sel.innerHTML = list.map(o => `<option value="${o.id}">#${o.id} ${escapeHtml(o.topic)}</option>`).join('');
+        if (currentOutlineId) sel.value = String(currentOutlineId);
+      } catch (e) { /* ignore */ }
+    }
+    document.querySelector('[data-action="generate-ppt"]').addEventListener('click', async () => {
+      const outline_id = +document.getElementById('generate-outline-id').value;
+      const style = document.getElementById('generate-style').value;
+      const image_mode = document.getElementById('generate-image-mode').value;
+      const btn = document.querySelector('[data-action="generate-ppt"]');
+      btn.textContent = '生成中...'; btn.disabled = true;
+      document.getElementById('generate-result').classList.add('hidden');
+      try {
+        const res = await api('POST', '/api/ppt/generate', { outline_id, style, image_mode });
+        const host = document.getElementById('generate-result');
+        host.classList.remove('hidden');
+        document.getElementById('generate-status').textContent = `生成成功 (id=${res.generation_id})`;
+        document.getElementById('download-pptx').href = `/api/download/${res.generation_id}/pptx`;
+        const pdfWarn = document.getElementById('pdf-warning');
+        if (res.pdf_path) {
+          document.getElementById('download-pdf').href = `/api/download/${res.generation_id}/pdf`;
+          document.getElementById('download-pdf').classList.remove('hidden');
+          pdfWarn.classList.add('hidden');
+        } else {
+          document.getElementById('download-pdf').classList.add('hidden');
+          pdfWarn.textContent = res.pdf_error || 'PDF 不可用';
+          pdfWarn.classList.remove('hidden');
+        }
+      } catch (e) {
+        alert('生成失败：' + e.message);
+      } finally {
+        btn.textContent = '生成 PPT'; btn.disabled = false;
+      }
+    });
+
+    // ---- History tab ----
+    async function refreshHistory() {
+      try {
+        const outlines = await api('GET', '/api/history/outlines');
+        document.getElementById('history-outlines').innerHTML = outlines.map(o =>
+          `<li class="bg-white border rounded p-2">#${o.id} ${escapeHtml(o.topic)} <span class="text-xs text-slate-500">${o.created_at}</span></li>`
+        ).join('') || '<li class="text-slate-500 text-xs">暂无</li>';
+        const gens = await api('GET', '/api/history/generations');
+        document.getElementById('history-generations').innerHTML = gens.map(g =>
+          `<li class="bg-white border rounded p-2 flex justify-between items-center">
+             <span>#${g.id} outline=${g.outline_id} style=${g.style}</span>
+             <span class="flex gap-2">
+               <a class="text-emerald-600" href="/api/download/${g.id}/pptx">.pptx</a>
+               ${g.pdf_path ? `<a class="text-emerald-600" href="/api/download/${g.id}/pdf">.pdf</a>` : ''}
+             </span>
+           </li>`).join('') || '<li class="text-slate-500 text-xs">暂无</li>';
+      } catch (e) { /* ignore */ }
+    }
+  </script>
+</body>
+</html>
