@@ -33,6 +33,15 @@ class Outline(BaseModel):
     pages: list[OutlinePage]
 
 
+class SourceFile(BaseModel):
+    """Metadata for an uploaded source document attached to an outline."""
+
+    filename: str
+    stored_path: str
+    char_count: int
+    mime_type: str | None = None
+
+
 class OutlineGenerateRequest(BaseModel):
     topic: str
     requirements: str | None = None
@@ -42,6 +51,7 @@ class OutlineGenerateRequest(BaseModel):
 class OutlineGenerateResponse(BaseModel):
     outline_id: int
     content: Outline
+    source_files: list[SourceFile] = Field(default_factory=list)
 
 
 class PPTRequest(BaseModel):

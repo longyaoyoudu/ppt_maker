@@ -101,9 +101,9 @@ python run.py
 ## 使用流程
 
 1. **模型配置**（首次必做）：为"大纲设计"和"PPT 生成"两个阶段分别填写 Provider、Base URL（仅 OpenAI 兼容需要）、API Key、Model Name，点击「保存」。
-2. **大纲设计**：输入主题（可选补充要求），点击「生成大纲」。生成后可直接增删改页面。
+2. **大纲设计**：输入主题（可选补充要求、PDF/Word 附件），点击「生成大纲」。生成后可直接增删改页面。附件中的文本会被自动提取并加入 LLM 上下文。
 3. **生成 PPT**：选择大纲 → 选风格 → 选配图模式 → 点击「生成 PPT」。完成后会显示 `.pptx` 与 `.pdf` 下载链接。
-4. **历史记录**：所有大纲与生成结果持久化保留，可随时回看或重新下载。
+4. **历史记录**：所有大纲与生成结果持久化保留，可随时回看或重新下载附件。
 
 ---
 
@@ -145,8 +145,9 @@ PPTM_DATA_DIR=/var/lib/pptm PPTM_OUTPUTS_DIR=/var/lib/pptm/outputs python run.py
 |---|---|---|
 | `GET` | `/api/health` | 健康检查 |
 | `GET` / `PUT` | `/api/config/{stage}` | 读写阶段模型配置（`stage=outline\|ppt`） |
-| `POST` | `/api/outline/generate` | 调用大纲 LLM 生成结构化大纲 |
+| `POST` | `/api/outline/generate` | 调用大纲 LLM 生成结构化大纲（multipart：topic + 可选 requirements + 可选 files） |
 | `PUT` | `/api/outline/{id}` | 更新已存在的大纲 |
+| `GET` | `/api/outline/{id}/source/{filename}` | 下载大纲关联的原始附件 |
 | `POST` | `/api/ppt/generate` | 基于大纲生成 `.pptx`（可选转 `.pdf`） |
 | `GET` | `/api/history/outlines` | 大纲历史列表 |
 | `GET` | `/api/history/generations` | 生成历史列表 |

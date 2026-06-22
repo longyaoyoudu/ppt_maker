@@ -66,8 +66,12 @@
         <input id="outline-topic" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="例如：AI 在医疗领域的应用">
         <label class="block text-xs text-slate-500">补充要求 (可选)</label>
         <textarea id="outline-requirements" rows="3" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="例如：面向医生群体、希望偏学术风格"></textarea>
+        <label class="block text-xs text-slate-500">附件资料 (可选，支持 PDF / Word，多文件)</label>
+        <input id="outline-files" type="file" multiple accept=".pdf,.docx" class="w-full border rounded px-2 py-1.5 text-sm file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-slate-100 file:text-sm">
+        <div id="outline-files-info" class="text-xs text-slate-500"></div>
         <button data-action="generate-outline" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">生成大纲</button>
       </div>
+      <div id="outline-source-info" class="hidden bg-white border rounded-lg p-3 text-xs text-slate-600 space-y-1"></div>
       <div id="outline-pages" class="space-y-3"></div>
       <div id="outline-actions" class="hidden">
         <button data-action="save-outline" class="bg-emerald-600 text-white text-sm px-3 py-1.5 rounded">保存大纲</button>
@@ -134,9 +138,14 @@
     }));
     document.querySelector('#tabs .tab[data-tab="config"]').classList.add('bg-blue-50', 'text-blue-700');
 
-    async function api(method, url, body) {
-      const opts = { method, headers: { 'Content-Type': 'application/json' } };
-      if (body) opts.body = JSON.stringify(body);
+    async function api(method, url, body, formData) {
+      const opts = { method };
+      if (formData) {
+        opts.body = formData;
+      } else if (body) {
+        opts.headers = { 'Content-Type': 'application/json' };
+        opts.body = JSON.stringify(body);
+      }
       const r = await fetch(url, opts);
       if (!r.ok) {
         const text = await r.text();
@@ -183,6 +192,17 @@
     // ---- Outline tab ----
     let currentOutlineId = null;
     let currentPages = [];
+    let currentSourceFiles = [];
+
+    // Update attached-files info when selection changes
+    document.getElementById('outline-files').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      const info = document.getElementById('outline-files-info');
+      if (!files.length) { info.textContent = ''; return; }
+      const totalMB = (files.reduce((s, f) => s + f.size, 0) / (1024 * 1024)).toFixed(2);
+      info.textContent = `已选 ${files.length} 个文件，合计 ${totalMB} MB`;
+    });
+
     document.querySelector('[data-action="generate-outline"]').addEventListener('click', async () => {
       const topic = document.getElementById('outline-topic').value.trim();
       const requirements = document.getElementById('outline-requirements').value.trim() || null;
@@ -190,10 +210,18 @@
       const btn = document.querySelector('[data-action="generate-outline"]');
       btn.textContent = '生成中...'; btn.disabled = true;
       try {
-        const res = await api('POST', '/api/outline/generate', { topic, requirements });
+        const fd = new FormData();
+        fd.append('topic', topic);
+        if (requirements) fd.append('requirements', requirements);
+        for (const f of document.getElementById('outline-files').files) {
+          fd.append('files', f);
+        }
+        const res = await api('POST', '/api/outline/generate', null, fd);
         currentOutlineId = res.outline_id;
         currentPages = res.content.pages;
+        currentSourceFiles = res.source_files || [];
         renderOutlinePages();
+        renderSourceInfo();
         document.getElementById('outline-actions').classList.remove('hidden');
       } catch (e) {
         alert('生成失败：' + e.message);
@@ -201,6 +229,22 @@
         btn.textContent = '生成大纲'; btn.disabled = false;
       }
     });
+
+    function renderSourceInfo() {
+      const host = document.getElementById('outline-source-info');
+      if (!currentSourceFiles.length) {
+        host.classList.add('hidden');
+        host.innerHTML = '';
+        return;
+      }
+      host.classList.remove('hidden');
+      host.innerHTML =
+        '<div class="font-medium text-slate-700">附件资料：</div>' +
+        currentSourceFiles.map(sf =>
+          `<div>📎 <span class="font-mono">${escapeHtml(sf.filename)}</span> ` +
+          `<span class="text-slate-400">(${sf.char_count} 字符)</span></div>`
+        ).join('');
+    }
 
     function renderOutlinePages() {
       const host = document.getElementById('outline-pages');
@@ -292,9 +336,22 @@
     async function refreshHistory() {
       try {
         const outlines = await api('GET', '/api/history/outlines');
-        document.getElementById('history-outlines').innerHTML = outlines.map(o =>
-          `<li class="bg-white border rounded p-2">#${o.id} ${escapeHtml(o.topic)} <span class="text-xs text-slate-500">${o.created_at}</span></li>`
-        ).join('') || '<li class="text-slate-500 text-xs">暂无</li>';
+        document.getElementById('history-outlines').innerHTML = outlines.map(o => {
+          const files = o.source_files || [];
+          const fileLinks = files.length
+            ? '<div class="mt-1 ml-2 text-xs space-x-2">' +
+              files.map(sf =>
+                `<a class="text-emerald-600" target="_blank" href="/api/outline/${o.id}/source/${encodeURIComponent(sf.filename)}">📎 ${escapeHtml(sf.filename)}</a>`
+              ).join('') +
+              '</div>'
+            : '';
+          return `<li class="bg-white border rounded p-2">
+                    <div>#${o.id} ${escapeHtml(o.topic)}
+                      <span class="text-xs text-slate-500">${o.created_at}</span>
+                    </div>
+                    ${fileLinks}
+                  </li>`;
+        }).join('') || '<li class="text-slate-500 text-xs">暂无</li>';
         const gens = await api('GET', '/api/history/generations');
         document.getElementById('history-generations').innerHTML = gens.map(g =>
           `<li class="bg-white border rounded p-2 flex justify-between items-center">

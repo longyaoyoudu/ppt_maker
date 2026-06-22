@@ -24,6 +24,44 @@ def test_init_idempotent(tmp_dir):
     assert db_path.exists()
 
 
+def test_init_adds_source_files_column_to_existing_db(tmp_dir):
+    """Migration: re-running init_db on an old schema adds source_files column."""
+    db_path = tmp_dir / "test.db"
+    # Create a "legacy" outlines table without source_files.
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript("""
+            CREATE TABLE model_configs (
+                stage TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                base_url TEXT,
+                api_key TEXT NOT NULL,
+                model_name TEXT NOT NULL,
+                extra_params TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE outlines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                topic TEXT NOT NULL,
+                requirements TEXT,
+                content_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE generations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                outline_id INTEGER REFERENCES outlines(id),
+                style TEXT,
+                image_mode TEXT,
+                pptx_path TEXT,
+                pdf_path TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+    init_db(db_path)  # should migrate
+    with get_connection(db_path) as conn:
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(outlines)").fetchall()}
+    assert "source_files" in cols
+
+
 def test_get_connection_yields_row_factory(tmp_dir):
     db_path = tmp_dir / "test.db"
     init_db(db_path)
