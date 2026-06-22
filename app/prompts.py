@@ -13,6 +13,8 @@ OUTLINE_USER_TEMPLATE = """Topic: {topic}
 
 {requirements_block}
 
+{document_block}
+
 Output schema:
 {{
   "pages": [
@@ -29,11 +31,21 @@ Constraints:
 - Return only the JSON object."""
 
 
-def build_outline_user(topic: str, requirements: str | None, style_hint: str | None) -> str:
+def build_outline_user(
+    topic: str,
+    requirements: str | None,
+    style_hint: str | None,
+    document_excerpt: str | None = None,
+) -> str:
     extra_lines = []
     if requirements:
         extra_lines.append(f"Additional requirements: {requirements}")
     if style_hint:
         extra_lines.append(f"Style hint: {style_hint}")
     requirements_block = "\n".join(extra_lines) if extra_lines else "(no extra requirements)"
-    return OUTLINE_USER_TEMPLATE.format(topic=topic, requirements_block=requirements_block)
+    document_block = (
+        "Source documents:\n" + document_excerpt if document_excerpt else "(no source documents)"
+    )
+    return OUTLINE_USER_TEMPLATE.format(
+        topic=topic, requirements_block=requirements_block, document_block=document_block
+    )

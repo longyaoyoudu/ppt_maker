@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS outlines (
     topic TEXT NOT NULL,
     requirements TEXT,
     content_json TEXT NOT NULL,
+    source_files TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -56,8 +57,23 @@ def init_db(path: Path | None = None) -> Path:
     db_path = path or default_db_path()
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         conn.executescript(SCHEMA)
+        _apply_migrations(conn)
     return db_path
+
+
+def _apply_migrations(conn: sqlite3.Connection) -> None:
+    """Apply additive schema migrations for existing databases.
+
+    Currently: add `source_files` column to `outlines` if missing
+    (introduced in PR #8 for uploaded PDF/DOCX attachments).
+    """
+    outlines_cols = {
+        row["name"] for row in conn.execute("PRAGMA table_info(outlines)").fetchall()
+    }
+    if "source_files" not in outlines_cols:
+        conn.execute("ALTER TABLE outlines ADD COLUMN source_files TEXT")
 
 
 @contextmanager

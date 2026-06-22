@@ -24,8 +24,19 @@ class OutlineService:
     def __init__(self, provider: LLMProvider) -> None:
         self._provider = provider
 
-    def generate(self, topic: str, requirements: str | None, style_hint: str | None) -> Outline:
-        user_msg = build_outline_user(topic=topic, requirements=requirements, style_hint=style_hint)
+    def generate(
+        self,
+        topic: str,
+        requirements: str | None,
+        style_hint: str | None,
+        document_text: str | None = None,
+    ) -> Outline:
+        user_msg = build_outline_user(
+            topic=topic,
+            requirements=requirements,
+            style_hint=style_hint,
+            document_excerpt=document_text,
+        )
         last_err: Exception | None = None
         for attempt in range(2):
             prompt = user_msg if attempt == 0 else (
