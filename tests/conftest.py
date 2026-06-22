@@ -1,4 +1,6 @@
 """Shared pytest fixtures."""
+import shutil
+import tempfile
 from collections.abc import Generator
 from pathlib import Path
 
@@ -7,8 +9,20 @@ import pytest
 
 @pytest.fixture
 def tmp_dir() -> Generator[Path, None, None]:
-    with __import__("tempfile").TemporaryDirectory() as d:
+    """A per-test temp directory. Cleanup tolerates Windows file-lock races
+    that occur when SQLite connections are still releasing handles."""
+    d = tempfile.mkdtemp()
+    try:
         yield Path(d)
+    finally:
+        # Force garbage collection so any lingering sqlite3 handles close.
+        import gc
+        gc.collect()
+        # Best-effort cleanup; ignore Windows "file in use" errors.
+        try:
+            shutil.rmtree(d, ignore_errors=False)
+        except (OSError, PermissionError):
+            shutil.rmtree(d, ignore_errors=True)
 
 
 @pytest.fixture
