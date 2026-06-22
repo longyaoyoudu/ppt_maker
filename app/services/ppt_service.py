@@ -138,6 +138,19 @@ class PPTService:
                 str(images_dir / f"slide_{idx}.png"),
                 Inches(9.5), Inches(5.0), Inches(3.3), Inches(1.8),
             )
+        elif image_mode == "ai":
+            try:
+                self._images.ai_generate(
+                    out_path=images_dir / f"slide_{idx}.png",
+                    prompt=f"Illustration for slide titled '{page.title}', {outline.topic} topic",
+                )
+                slide.shapes.add_picture(
+                    str(images_dir / f"slide_{idx}.png"),
+                    Inches(9.5), Inches(5.0), Inches(3.3), Inches(1.8),
+                )
+            except RuntimeError:
+                # Image provider not configured or call failed — fall back silently.
+                pass
 
     def _build_two_column(self, prs, outline, page, idx, t, image_mode, images_dir):
         slide = self._add_blank(prs)

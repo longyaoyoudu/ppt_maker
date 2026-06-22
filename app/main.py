@@ -36,6 +36,8 @@ from app.services.document_parser import (
     parse_document,
     safe_filename,
 )
+from app.services.image_providers import build_image_provider
+from app.services.image_service import ImageService
 from app.services.outline_service import OutlineParseError, OutlineService
 from app.services.pdf_service import LibreOfficeNotFound, PDFService
 from app.services.ppt_service import PPTService
@@ -78,6 +80,29 @@ def _require_provider(stage: str) -> Any:
     })
 
 
+def _build_image_service() -> ImageService | None:
+    """Build an ImageService backed by the user-configured image model.
+
+    Returns None when no image model is configured (so PPTService falls
+    back to placeholder/none modes). Returns an ImageService with no
+    provider if configuration is invalid (AI mode will then raise).
+    """
+    try:
+        cfg = _config_store().get("image")
+    except ConfigNotFound:
+        return None
+    try:
+        provider = build_image_provider({
+            "provider": cfg.provider,
+            "api_key": cfg.api_key,
+            "model_name": cfg.model_name,
+            "base_url": cfg.base_url,
+        })
+    except ValueError:
+        return None
+    return ImageService(image_provider=provider)
+
+
 # --- request/response models local to the API ------------------------------
 
 class PutConfigRequest(BaseModel):
@@ -103,8 +128,8 @@ def health() -> dict[str, str]:
 # config
 @app.get("/api/config/{stage}")
 def get_config(stage: str):
-    if stage not in ("outline", "ppt"):
-        raise HTTPException(status_code=400, detail="stage must be 'outline' or 'ppt'")
+    if stage not in ("outline", "ppt", "image"):
+        raise HTTPException(status_code=400, detail="stage must be 'outline', 'ppt', or 'image'")
     store = _config_store()
     try:
         cfg = store.get(stage)
@@ -266,7 +291,8 @@ def generate_ppt(body: PPTRequest):
     stamp = int(time.time() * 1000)
     pptx_path = outputs / f"ppt_{body.outline_id}_{body.style}_{stamp}.pptx"
     images_dir = outputs / f"img_{body.outline_id}_{stamp}"
-    service = PPTService()
+    image_service = _build_image_service()
+    service = PPTService(image_service=image_service)
     service.build(
         outline=row.content, style=body.style, image_mode=body.image_mode,
         out_path=pptx_path, images_dir=images_dir,
