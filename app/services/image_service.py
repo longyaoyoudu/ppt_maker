@@ -1,6 +1,8 @@
 """Image generation: placeholder rectangles or AI-generated PNGs.
 
-AI mode uses the OpenAI Images API (works for any compatible endpoint).
+AI mode delegates to an injected ImageProvider (see app.services.image_providers).
+The provider is injected rather than constructed here so callers (the API layer)
+can pick the provider based on user-configured model settings.
 """
 from __future__ import annotations
 
@@ -11,16 +13,20 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 class _ImageCapable(Protocol):
-    model: str
-
-    def generate_image(self, prompt: str, *, size: str, n: int) -> list[bytes]: ...
+    def generate_image(self, prompt: str, *, n: int = 1, aspect_ratio: str | None = None) -> list[bytes]: ...
 
 
 class ImageService:
-    def __init__(self, openai_provider: _ImageCapable | None = None) -> None:
-        self._provider = openai_provider
+    def __init__(self, image_provider: _ImageCapable | None = None) -> None:
+        self._provider = image_provider
 
-    def placeholder(self, *, out_path: Path, color: tuple[int, int, int] = (220, 220, 220), text: str = "图片占位") -> Path:
+    def placeholder(
+        self,
+        *,
+        out_path: Path,
+        color: tuple[int, int, int] = (220, 220, 220),
+        text: str = "图片占位",
+    ) -> Path:
         img = Image.new("RGB", (800, 450), color=color)
         draw = ImageDraw.Draw(img)
         try:
@@ -34,24 +40,21 @@ class ImageService:
         img.save(out_path, format="PNG")
         return out_path
 
-    def ai_generate(self, *, out_path: Path, prompt: str, api_key: str, base_url: str | None, model: str = "dall-e-3") -> Path:
+    def ai_generate(
+        self,
+        *,
+        out_path: Path,
+        prompt: str,
+        aspect_ratio: str | None = None,
+    ) -> Path:
         if self._provider is None:
             raise RuntimeError(
-                "ImageService was constructed without an openai_provider; "
-                "inject one (e.g. _OpenAIImageProvider) before calling ai_generate."
+                "ImageService was constructed without an image_provider; "
+                "configure an image model in 模型配置 → 图片生成模型 first."
             )
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        data = self._provider.generate_image(prompt, size="1024x1024", n=1)
+        data = self._provider.generate_image(prompt, n=1, aspect_ratio=aspect_ratio)
+        if not data:
+            raise RuntimeError("Image provider returned no images")
         out_path.write_bytes(data[0])
         return out_path
-
-
-class _OpenAIImageProvider:
-    def __init__(self, images_client) -> None:
-        self._client = images_client
-        self.model = "dall-e-3"
-
-    def generate_image(self, prompt: str, *, size: str, n: int) -> list[bytes]:
-        import base64
-        resp = self._client.generate(model=self.model, prompt=prompt, size=size, n=n, response_format="b64_json")
-        return [base64.b64decode(d.b64_json) for d in resp.data]

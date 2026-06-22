@@ -1,6 +1,8 @@
 """Tests for Pydantic models."""
 import json
 
+import pytest
+
 from app.models import ModelConfig, OutlinePage, Outline, PPTRequest
 
 
@@ -12,6 +14,16 @@ def test_model_config_serialization():
     assert d["stage"] == "outline"
     c2 = ModelConfig(**d)
     assert c2 == c
+
+
+def test_model_config_image_stage_is_valid():
+    c = ModelConfig(stage="image", provider="minimax", api_key="k", model_name="image-01")
+    assert c.stage == "image"
+
+
+def test_model_config_rejects_unknown_stage():
+    with pytest.raises(ValueError):
+        ModelConfig(stage="bogus", provider="openai", api_key="k", model_name="m")
 
 
 def test_outline_page_validation():

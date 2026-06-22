@@ -23,8 +23,8 @@
     <!-- Tab: Config -->
     <section data-panel="config" class="space-y-6">
       <h2 class="text-lg font-semibold">模型配置</h2>
-      <p class="text-sm text-slate-600">为两个阶段分别配置大模型。API Key 仅保存在本地浏览器所在设备的 SQLite 中。</p>
-      <div class="grid md:grid-cols-2 gap-6">
+      <p class="text-sm text-slate-600">分别为三个阶段配置模型（大纲 / PPT / 配图）。API Key 仅保存在本地浏览器所在设备的 SQLite 中。</p>
+      <div class="grid md:grid-cols-3 gap-6">
         <!-- Outline stage card -->
         <div class="bg-white border rounded-lg p-4 space-y-3">
           <h3 class="font-medium">大纲设计模型</h3>
@@ -40,7 +40,7 @@
           <input data-cfg="outline.model_name" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="gpt-4o / claude-sonnet-4-6">
           <button data-action="save-config" data-stage="outline" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">保存</button>
         </div>
-        <!-- PPT stage card (mirrors above, data-stage="ppt") -->
+        <!-- PPT stage card -->
         <div class="bg-white border rounded-lg p-4 space-y-3">
           <h3 class="font-medium">PPT 生成模型</h3>
           <select data-cfg="ppt.provider" class="w-full border rounded px-2 py-1.5 text-sm">
@@ -54,6 +54,21 @@
           <label class="block text-xs text-slate-500">Model Name</label>
           <input data-cfg="ppt.model_name" class="w-full border rounded px-2 py-1.5 text-sm">
           <button data-action="save-config" data-stage="ppt" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">保存</button>
+        </div>
+        <!-- Image stage card -->
+        <div class="bg-white border rounded-lg p-4 space-y-3">
+          <h3 class="font-medium">配图模型 <span class="text-xs text-slate-400">(可选)</span></h3>
+          <select data-cfg="image.provider" class="w-full border rounded px-2 py-1.5 text-sm">
+            <option value="minimax">MiniMax image-01</option>
+            <option value="openai">OpenAI DALL·E</option>
+          </select>
+          <label class="block text-xs text-slate-500">Base URL (可选，默认 MiniMax 官方)</label>
+          <input data-cfg="image.base_url" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="https://api.minimaxi.com">
+          <label class="block text-xs text-slate-500">API Key</label>
+          <input data-cfg="image.api_key" type="password" class="w-full border rounded px-2 py-1.5 text-sm">
+          <label class="block text-xs text-slate-500">Model Name</label>
+          <input data-cfg="image.model_name" class="w-full border rounded px-2 py-1.5 text-sm" placeholder="image-01 / dall-e-3">
+          <button data-action="save-config" data-stage="image" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">保存</button>
         </div>
       </div>
     </section>
@@ -95,7 +110,7 @@
         <label class="block text-xs text-slate-500">配图</label>
         <select id="generate-image-mode" class="w-full border rounded px-2 py-1.5 text-sm">
           <option value="placeholder">占位图</option>
-          <option value="ai">AI 生成 (需 OpenAI 兼容服务)</option>
+          <option value="ai">AI 生成 (需在「模型配置」中设置配图模型)</option>
           <option value="none">不插图</option>
         </select>
         <button data-action="generate-ppt" class="bg-blue-600 text-white text-sm px-3 py-1.5 rounded">生成 PPT</button>
@@ -177,7 +192,7 @@
 
     // Load existing config on page load
     async function loadConfig() {
-      for (const stage of ['outline', 'ppt']) {
+      for (const stage of ['outline', 'ppt', 'image']) {
         try {
           const cfg = await api('GET', `/api/config/${stage}`);
           document.querySelector(`[data-cfg="${stage}.provider"]`).value = cfg.provider;

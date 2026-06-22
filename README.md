@@ -34,6 +34,7 @@
 - **多模型兼容**：同一套代码支持 OpenAI 兼容协议（OpenAI / DeepSeek / Moonshot / Zhipu / Ollama …）和 Anthropic Claude。
 - **结构可编辑**：前端支持增删改大纲页面，调整页面布局、要点。
 - **风格与配图**：4 种风格（商务 / 学术 / 极简 / 创意）× 3 种配图模式（占位图 / AI 生成 / 不插图）。
+- **可插拔配图**：配图阶段支持 MiniMax 官方图像 API（`image-01` / `image-01-live`）与 OpenAI DALL·E（以及任意 OpenAI 兼容图像服务），未配置时自动回退为占位图。
 - **.pptx + .pdf 双导出**：PDF 通过本地 LibreOffice 转换，失败时不阻塞 .pptx 下载。
 - **本地优先**：API Key 仅保存在本机 SQLite 数据库（`data/app.db`），不上传任何服务端。
 
@@ -100,7 +101,7 @@ python run.py
 
 ## 使用流程
 
-1. **模型配置**（首次必做）：为"大纲设计"和"PPT 生成"两个阶段分别填写 Provider、Base URL（仅 OpenAI 兼容需要）、API Key、Model Name，点击「保存」。
+1. **模型配置**（首次必做）：为"大纲设计"、"PPT 生成"两个阶段分别填写 Provider、Base URL（仅 OpenAI 兼容需要）、API Key、Model Name，点击「保存」。如需 AI 配图，额外在第三张卡片里填写"配图模型"（支持 MiniMax `image-01` / `image-01-live`，或 OpenAI `dall-e-3` 等）。
 2. **大纲设计**：输入主题（可选补充要求、PDF/Word 附件），点击「生成大纲」。生成后可直接增删改页面。附件中的文本会被自动提取并加入 LLM 上下文。
 3. **生成 PPT**：选择大纲 → 选风格 → 选配图模式 → 点击「生成 PPT」。完成后会显示 `.pptx` 与 `.pdf` 下载链接。
 4. **历史记录**：所有大纲与生成结果持久化保留，可随时回看或重新下载附件。
@@ -119,6 +120,8 @@ python run.py
 | Zhipu (GLM) | `openai` | `https://open.bigmodel.cn/api/paas/v4` | |
 | Ollama（本地） | `openai` | `http://127.0.0.1:11434/v1` | 任意 key 即可 |
 | Anthropic Claude | `claude` | 留空 | `claude-sonnet-4-6`、`claude-opus-4-7` 等 |
+| MiniMax（配图） | `minimax` | `https://api.minimaxi.com` | `image-01`、`image-01-live`（在「配图模型」卡片配置） |
+| DALL·E（配图） | `openai` | `https://api.openai.com/v1` | `dall-e-3`（在「配图模型」卡片配置） |
 
 ---
 
@@ -144,7 +147,7 @@ PPTM_DATA_DIR=/var/lib/pptm PPTM_OUTPUTS_DIR=/var/lib/pptm/outputs python run.py
 | 方法 | 路径 | 用途 |
 |---|---|---|
 | `GET` | `/api/health` | 健康检查 |
-| `GET` / `PUT` | `/api/config/{stage}` | 读写阶段模型配置（`stage=outline\|ppt`） |
+| `GET` / `PUT` | `/api/config/{stage}` | 读写阶段模型配置（`stage=outline\|ppt\|image`） |
 | `POST` | `/api/outline/generate` | 调用大纲 LLM 生成结构化大纲（multipart：topic + 可选 requirements + 可选 files） |
 | `PUT` | `/api/outline/{id}` | 更新已存在的大纲 |
 | `GET` | `/api/outline/{id}/source/{filename}` | 下载大纲关联的原始附件 |
@@ -182,11 +185,12 @@ ppt_maker/
 │   └── services/
 │       ├── outline_service.py   # 大纲生成 + JSON 解析重试
 │       ├── ppt_service.py       # python-pptx 渲染
-│       ├── image_service.py     # 占位图 / AI 配图
+│       ├── image_service.py     # 占位图 / AI 配图入口
+│       ├── image_providers.py   # MiniMax / OpenAI 图像 provider
 │       └── pdf_service.py       # LibreOffice .pptx → .pdf
 ├── static/
 │   └── index.html               # 单页前端（无构建步骤）
-├── tests/                       # pytest 套件（56+ 用例）
+├── tests/                       # pytest 套件（100+ 用例）
 ├── docs/
 │   └── superpowers/
 │       ├── specs/               # 设计文档

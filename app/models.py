@@ -6,14 +6,14 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-Provider = Literal["openai", "claude"]
+Provider = Literal["openai", "claude", "minimax"]
 Layout = Literal["title", "title-content", "two-column", "quote", "section"]
 Style = Literal["business", "academic", "minimal", "creative"]
 ImageMode = Literal["placeholder", "ai", "none"]
 
 
 class ModelConfig(BaseModel):
-    stage: Literal["outline", "ppt"]
+    stage: Literal["outline", "ppt", "image"]
     provider: Provider
     api_key: str
     model_name: str
