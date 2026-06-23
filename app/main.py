@@ -143,6 +143,18 @@ def put_config(stage: str, body: PutConfigRequest):
     if stage != body.stage:
         raise HTTPException(status_code=400, detail="stage in URL and body must match")
     cfg = ModelConfig(**body.model_dump())
+    # Image stage: try to instantiate the provider now so URL / API-key errors
+    # are reported at save time (400) instead of crashing later in /api/ppt/generate.
+    if stage == "image":
+        try:
+            build_image_provider({
+                "provider": cfg.provider,
+                "api_key": cfg.api_key,
+                "model_name": cfg.model_name,
+                "base_url": cfg.base_url,
+            })
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"配图模型配置无效：{e}")
     _config_store().save(cfg)
     return {"ok": True}
 
