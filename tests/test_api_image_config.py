@@ -56,6 +56,30 @@ def test_put_image_config_returns_ok(client_with_image_config):
     assert again["model_name"] == "dall-e-3"
 
 
+def test_put_image_config_rejects_bad_base_url(tmp_path, monkeypatch):
+    """A base_url without http(s):// must be rejected at save time with 400.
+
+    Previously such configs saved fine but crashed later in /api/ppt/generate
+    with a 500 (httpx.UnsupportedProtocol). Now validation happens up front.
+    """
+    db = tmp_path / "app.db"
+    init_db(db)
+    outputs = tmp_path / "outputs"
+    outputs.mkdir()
+    monkeypatch.setenv("PPTM_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("PPTM_OUTPUTS_DIR", str(outputs))
+    with TestClient(app) as c:
+        r = c.put("/api/config/image", json={
+            "stage": "image",
+            "provider": "minimax",
+            "api_key": "k",
+            "model_name": "image-01",
+            "base_url": "api.minimaxi.com",  # missing protocol — the bug from PR #9
+        })
+    assert r.status_code == 400
+    assert "http" in r.json()["detail"]
+
+
 def test_get_config_rejects_unknown_stage(client_with_image_config):
     c, _, _ = client_with_image_config
     r = c.get("/api/config/bogus")

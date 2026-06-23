@@ -15,6 +15,25 @@ import httpx
 DEFAULT_MINIMAX_BASE_URL = "https://api.minimaxi.com"
 
 
+def _normalize_base_url(base_url: str | None, default: str | None) -> str | None:
+    """Validate and normalize an API base URL.
+
+    Returns the URL with trailing slash stripped and whitespace removed.
+    Raises ValueError if a non-empty URL does not start with http:// or https://,
+    so callers fail fast (instead of httpx crashing at request time with an
+    obscure UnsupportedProtocol error).
+    """
+    raw = (base_url or default or "").strip()
+    if not raw:
+        return default  # type: ignore[return-value]
+    cleaned = raw.rstrip("/")
+    if not cleaned.lower().startswith(("http://", "https://")):
+        raise ValueError(
+            f"base_url must start with http:// or https:// (got: {base_url!r})"
+        )
+    return cleaned
+
+
 @runtime_checkable
 class ImageProvider(Protocol):
     def generate_image(
@@ -45,7 +64,7 @@ class MiniMaxImageProvider:
             raise ValueError("api_key is required")
         self._api_key = api_key
         self._model = model
-        self._base_url = (base_url or DEFAULT_MINIMAX_BASE_URL).rstrip("/")
+        self._base_url = _normalize_base_url(base_url, DEFAULT_MINIMAX_BASE_URL)
         self._timeout = timeout
 
     def generate_image(
@@ -119,7 +138,8 @@ class OpenAIImageProvider:
         else:
             from openai import OpenAI
 
-            self._client = OpenAI(api_key=api_key, base_url=base_url)
+            normalized = _normalize_base_url(base_url, None)
+            self._client = OpenAI(api_key=api_key, base_url=normalized)
         self._model = model
         self._timeout = timeout
 

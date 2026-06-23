@@ -118,6 +118,26 @@ def test_minimax_provider_custom_base_url():
     assert p._base_url == "https://proxy.example.com"  # trailing slash stripped
 
 
+def test_minimax_provider_rejects_base_url_without_protocol():
+    """User-entered hostnames without http(s):// must fail fast at construction."""
+    with pytest.raises(ValueError, match="http"):
+        MiniMaxImageProvider(api_key="k", base_url="api.minimaxi.com")
+    with pytest.raises(ValueError, match="http"):
+        MiniMaxImageProvider(api_key="k", base_url="://broken")
+    with pytest.raises(ValueError, match="http"):
+        MiniMaxImageProvider(api_key="k", base_url="  api.minimaxi.com  ")  # whitespace only stripped
+
+
+def test_minimax_provider_strips_whitespace_around_url():
+    p = MiniMaxImageProvider(api_key="k", base_url="  https://api.minimaxi.com/  ")
+    assert p._base_url == "https://api.minimaxi.com"
+
+
+def test_minimax_provider_falls_back_to_default_for_empty():
+    p = MiniMaxImageProvider(api_key="k", base_url="")
+    assert p._base_url == "https://api.minimaxi.com"
+
+
 # --- OpenAI ---------------------------------------------------------------
 
 def test_openai_provider_uses_injected_client(monkeypatch):
@@ -170,6 +190,11 @@ def test_openai_provider_maps_aspect_ratio_to_size():
     assert p._aspect_to_size("16:9") == "1792x1024"
     assert p._aspect_to_size("9:16") == "1024x1792"
     assert p._aspect_to_size(None) == "1024x1024"
+
+
+def test_openai_provider_rejects_base_url_without_protocol():
+    with pytest.raises(ValueError, match="http"):
+        OpenAIImageProvider(api_key="k", base_url="api.openai.com")
 
 
 # --- factory --------------------------------------------------------------
